@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+            <meta name="author" content="twitter @disuye / Dan F">
+                <meta name="description" content="Bitcoin Block Clock (and other useful info) pushed from http://mempool.space 's awesome API.">
+                <link rel="stylesheet" href="index.css">
+                    <script src="https://mempool.space/mempool.js"></script>
+                    <script src="index.js"></script>
+    </head>
+    <body>
+
+        
+        <div id="info_ticker"><span id="clock"></span><span id="time_stamp"></span></div>
+        
+        <div id="block_height"></div>
+        
+        <div id="console_text">
+            <div id="status">
+                <script>
+                    document.getElementById("status").innerHTML = `status:&nbsp;attempting to connect<span class="cursor">&nbsp;&block;</span>`;
+                    // checkcnx is necessary for the screensaver version, if computer is offline, reload page until mempool.js becomes available...
+                    // TO DO: Make it more intelligent.
+                    const checkcnx = setTimeout(function(){
+                                                location.reload();
+                                            }, 10000);
+                    </script>
+                
+            </div>
+        </div>
+
+    </body>
+</html>
+
