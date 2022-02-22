@@ -1,35 +1,48 @@
 const init = async () => {
-    
+
     // Simple clock...
     
     setInterval(function() {
                 clock();
-                }, 200);
+                }, 250);
     
     function clock() {
-        var timeNow = new Date();
-        document.getElementById('clock').innerHTML = timeNow.toLocaleTimeString([], { hour12: false, });
+        var timeNow = new Date().toLocaleTimeString([], { hour12: false, });
+        // var timeZone = (Intl.DateTimeFormat().resolvedOptions().timeZone).replace(/_/g, ' ').replace(/\//g, '&nbsp;/\&nbsp;');
+        var timeZone = (new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })).slice(5);
+        document.getElementById('clock').innerHTML = timeNow;
+        document.getElementById('timezone').innerHTML = timeZone;
     }
     
-    // Update index.html page elements & status notification...
+    // index.html design elements...
 
     const status = `status:&nbsp;`;
     const cursor = `<span class="cursor">&nbsp;&middot;<span>`;
     
-    // Get the current tip height while waiting for the next ws = ...options: ['blocks'] to push...
+    // Get the current block height while waiting for the next ws = ...options: ['blocks'] to push...
 
     const { bitcoin: { blocks } } = mempoolJS({ hostname: 'mempool.space' });
     const blocksTipHeight = await blocks.getBlocksTipHeight();
+    const lastDigit = String(blocksTipHeight).slice(-1);
+        if (lastDigit == 1) {
+            var padding = "1.0vw";
+        } else if (lastDigit == 8 || lastDigit == 7 || lastDigit == 2) {
+            var padding = "2.6vw";
+        } else {
+            var padding = "3.0vw";
+        };
+    document.getElementById("block_height").style.setProperty("padding-right", padding, "important"); 
     document.getElementById("block_height").textContent = JSON.stringify(blocksTipHeight, undefined, 2);
     
     if (blocks){
+        // Current block timestamp...
         const hash = await blocks.getBlockHeight({ height: blocksTipHeight });
         const blockNow = await blocks.getBlock({ hash });
-        const blockTimeStamp = new Date(JSON.parse(blockNow.timestamp) * 1000).toLocaleTimeString([], { hour12: false, timeZoneName: 'short' });
+        const blockTimeStamp = new Date(JSON.parse(blockNow.timestamp) * 1000).toLocaleTimeString([], { hour12: false, });
         document.getElementById("time_stamp").textContent = blockTimeStamp;
         document.getElementById("status").innerHTML = status + "connected to <a href='https://mempool.space/'>mempool.space</a>";
         clearTimeout(checkcnx); // Trash the looping page reload (checkcnx is first defined in index.html)
-    }
+    };
     
     // Open websocket...
 
@@ -53,8 +66,20 @@ const init = async () => {
                         // Push data arrives from const ws = ...options: ['blocks']. approx. every 5~15 minutes.
                         
                         if (pushdata.block) {
-                        document.getElementById("block_height").textContent = JSON.parse(pushdata.block.height);
-                        document.getElementById("time_stamp").textContent = new Date(JSON.parse(pushdata.block.timestamp) * 1000).toLocaleTimeString([], { hour12: false, timeZoneName: 'short' });
+                        // Update block height...
+                        newBlockHeight = JSON.parse(pushdata.block.height);
+                        const lastDigit = String(newBlockHeight).slice(-1);
+                            if (lastDigit == 1) {
+                                var padding = "1.0vw";
+                            } else if (lastDigit == 8 || lastDigit == 7 || lastDigit == 2) {
+                                var padding = "2.6vw";
+                            } else {
+                                var padding = "3.0vw";
+                            };
+                            document.getElementById("block_height").style.setProperty("padding-right", padding, "important");
+                        document.getElementById("block_height").textContent = newBlockHeight;
+                        // Update block timestamp...
+                        document.getElementById("time_stamp").textContent = new Date(JSON.parse(pushdata.block.timestamp) * 1000).toLocaleTimeString([], { hour12: false, });
                         }
                         
                         });
