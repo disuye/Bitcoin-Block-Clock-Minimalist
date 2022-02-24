@@ -4,5 +4,6 @@
 {
     IBOutlet id configSheet;
     IBOutlet id screenDisplayOption;
+    IBOutlet id timeZoneOption;
 }
 @end
