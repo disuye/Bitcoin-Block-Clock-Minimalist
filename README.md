@@ -15,7 +15,7 @@ I took a chunk of code from [Word Clock Screensaver](https://github.com/chrstphr
 
 ## Install
 
-Download the Saver ZIP or compile everything yourself using the Xcode project.
+Download the ZIP or compile everything yourself using the Xcode project.
 
 Tested on macOS 10.12 thru 11.4. May or may not work on other versions. 
 
