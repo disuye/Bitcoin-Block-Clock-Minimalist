@@ -1,18 +1,39 @@
 const init = async () => {
+    
+    // Design elements to render after DOM loaded...
+    
+    document.addEventListener('DOMContentLoaded', function show_stuff() {
+        
+        // This variable is defined in BitcoinBlockClock.m so uncomment this line to view index.html in a regular web browser...
+        // var timeZoneOption = "timeZoneCity"; // options are timeZoneCity | timeZoneAbbrv | timeZoneDisable
+        
+        // Simple clock...
 
-    // Simple clock...
-    
-    setInterval(function() {
-                clock();
-                }, 250);
-    
-    function clock() {
-        var timeNow = new Date().toLocaleTimeString([], { hour12: false, });
-        // var timeZone = (Intl.DateTimeFormat().resolvedOptions().timeZone).replace(/_/g, ' ').replace(/\//g, '&nbsp;/\&nbsp;');
-        var timeZone = (new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })).slice(5);
-        document.getElementById('clock').innerHTML = timeNow;
+        setInterval(function() {
+                    clock();
+                    }, 250);
+        
+        function clock() {
+            var timeNow = new Date().toLocaleTimeString([], { hour12: false, });
+            document.getElementById('clock').innerHTML = timeNow;
+        }
+        
+        switch(timeZoneOption) {
+            case "timeZoneCity":
+            var timeZone = (Intl.DateTimeFormat().resolvedOptions().timeZone).replace(/_/g, ' ').replace(/\//g, '&nbsp;/\&nbsp;');
+            break;
+            case "timeZoneDisable":
+            var timeZone = "";
+            break;
+            default:
+                case "timeZoneAbbrv":
+                var timeZone = (new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })).slice(5);
+                break;
+        };
         document.getElementById('timezone').innerHTML = timeZone;
-    }
+        
+    });
+
     
     // index.html design elements...
 
@@ -26,21 +47,23 @@ const init = async () => {
     const lastDigit = String(blocksTipHeight).slice(-1);
         if (lastDigit == 1) {
             var padding = "1.0vw";
+        } else if (lastDigit == 3) {
+            var padding = "2.2vw";
         } else if (lastDigit == 8 || lastDigit == 7 || lastDigit == 2) {
             var padding = "2.6vw";
         } else {
-            var padding = "3.0vw";
+            var padding = "2.8vw";
         };
-    document.getElementById("block_height").style.setProperty("padding-right", padding, "important"); 
-    document.getElementById("block_height").textContent = JSON.stringify(blocksTipHeight, undefined, 2);
+    document.getElementById('block_height').style.setProperty("padding-right", padding, "important");
+    document.getElementById('block_height').textContent = JSON.stringify(blocksTipHeight, undefined, 2);
     
-    if (blocks){
+    if (blocks) {
         // Current block timestamp...
         const hash = await blocks.getBlockHeight({ height: blocksTipHeight });
         const blockNow = await blocks.getBlock({ hash });
         const blockTimeStamp = new Date(JSON.parse(blockNow.timestamp) * 1000).toLocaleTimeString([], { hour12: false, });
-        document.getElementById("time_stamp").textContent = blockTimeStamp;
-        document.getElementById("status").innerHTML = status + "connected to <a href='https://mempool.space/'>mempool.space</a>";
+        document.getElementById('time_stamp').textContent = blockTimeStamp;
+        document.getElementById('status').innerHTML = status + "connected to <a href='https://mempool.space/'>mempool.space</a>";
         clearTimeout(checkcnx); // Trash the looping page reload (checkcnx is first defined in index.html)
     };
     
@@ -55,8 +78,8 @@ const init = async () => {
                             const checkcnx = setTimeout(function(){
                                                         location.reload();
                                                     }, 10000);
-                            document.getElementById("status").innerHTML = status + "connection offline";
-                            });
+                            document.getElementById('status').innerHTML = status + "connection offline";
+                    });
     
     // Render new data...
     
@@ -71,17 +94,18 @@ const init = async () => {
                         const lastDigit = String(newBlockHeight).slice(-1);
                             if (lastDigit == 1) {
                                 var padding = "1.0vw";
+                            } else if (lastDigit == 3) {
+                                var padding = "2.2vw";
                             } else if (lastDigit == 8 || lastDigit == 7 || lastDigit == 2) {
                                 var padding = "2.6vw";
                             } else {
-                                var padding = "3.0vw";
+                                var padding = "2.8vw";
                             };
-                            document.getElementById("block_height").style.setProperty("padding-right", padding, "important");
-                        document.getElementById("block_height").textContent = newBlockHeight;
+                            document.getElementById('block_height').style.setProperty("padding-right", padding, "important");
+                        document.getElementById('block_height').textContent = newBlockHeight;
                         // Update block timestamp...
-                        document.getElementById("time_stamp").textContent = new Date(JSON.parse(pushdata.block.timestamp) * 1000).toLocaleTimeString([], { hour12: false, });
+                        document.getElementById('time_stamp').textContent = new Date(JSON.parse(pushdata.block.timestamp) * 1000).toLocaleTimeString([], { hour12: false, });
                         }
-                        
-                        });
+                });
     };
 init();
