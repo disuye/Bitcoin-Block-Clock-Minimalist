@@ -17,7 +17,7 @@
     
     [defaults registerDefaults:[NSDictionary dictionaryWithObjectsAndKeys:
                                 @"0", @"screenDisplayOption", // Default to show only on primary display
-                                @"0", @"timeZoneOption", // Default to display Abbreviated time zone, not Continent & City
+                                @"2", @"timeZoneOption",
                                 nil]];
     
     // Webview
@@ -26,6 +26,12 @@
     WebView* webView = [[WebView alloc] initWithFrame:NSMakeRect(0, 0, frame.size.width, frame.size.height)];
     webView.drawsBackground = NO; // Avoids a "white flash" just before the index.html file has loaded
     [webView.mainFrame loadRequest:[NSURLRequest requestWithURL:indexHTMLDocumentURL cachePolicy:NSURLRequestUseProtocolCachePolicy timeoutInterval:30.0]];
+    
+    // Nuke variable when declared in index.html (which is required for the non-screensaver version)...
+    
+    NSString * javascriptString = @"document.getElementById('timeZoneVariable').innerHTML='';";
+    [webView stringByEvaluatingJavaScriptFromString:javascriptString];
+    
     
     // Pass options from config sheet to index.js...
 
