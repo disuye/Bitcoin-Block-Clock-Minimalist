@@ -19,7 +19,7 @@
 html, body {
     width: 100%;
     height: 100%;
-    text-rendering:geometricPrecision;
+    text-rendering: optimizeLegibility;
 }
 
 body {
@@ -66,7 +66,8 @@ body {
 }
 
 #clock,
-#time_stamp {
+#time_stamp, 
+#timezone {
     padding-bottom: 0;
     margin-bottom: 0;
     display: inline-block;
@@ -74,20 +75,18 @@ body {
 
 #clock,
 #timezone {
-    color: darkgrey;
+    color: rgb(99, 99, 99);
 }
 
 #clock {
-    float: left;
     text-align: left;
-    padding-left: 78.5vw;
+    width: 9.2vw;
 }
 
 #timezone {
-    font-size: 1.25vw;
-    font-weight: 600;
-    letter-spacing: 0.06vw;
-    padding-right: 0.25vw;
+    font-size: 1.4vw;
+    font-weight: bold;
+    padding: 0 1vw 0 0;
 }
 
 /* faux console styling */
@@ -98,20 +97,12 @@ body {
     left: 0;
     top: 0;
     padding: 0.2vw;
-    max-width:33%;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 #status {
     font-family: 'Courier New', monospace;
     font-size: calc(4pt + 0.4vw);
-    color: #333;
-    width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    opacity: 1.0;
+    color: rgb(33, 33, 33);
     line-height: calc(4pt + 0.4vw);
 }
 
