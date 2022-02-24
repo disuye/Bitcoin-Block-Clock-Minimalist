@@ -1,11 +1,8 @@
 const init = async () => {
-    
+
     // Design elements to render after DOM loaded...
     
     document.addEventListener('DOMContentLoaded', function show_stuff() {
-        
-        // This variable is defined in BitcoinBlockClock.m so uncomment this line to view index.html in a regular web browser...
-        // var timeZoneOption = "timeZoneCity"; // options are timeZoneCity | timeZoneAbbrv | timeZoneDisable
         
         // Simple clock...
 
@@ -17,13 +14,15 @@ const init = async () => {
             var timeNow = new Date().toLocaleTimeString([], { hour12: false, });
             document.getElementById('clock').innerHTML = timeNow;
         }
+   
+        // const "timeZoneOption" defined in BitcoinBlockClock.m when run as a screesnaver, defined in index.html when run in web browser...
         
         switch(timeZoneOption) {
             case "timeZoneCity":
             var timeZone = (Intl.DateTimeFormat().resolvedOptions().timeZone).replace(/_/g, ' ').replace(/\//g, '&nbsp;/\&nbsp;');
             break;
             case "timeZoneDisable":
-            var timeZone = "";
+            var timeZone = null;
             break;
             default:
                 case "timeZoneAbbrv":
@@ -31,7 +30,6 @@ const init = async () => {
                 break;
         };
         document.getElementById('timezone').innerHTML = timeZone;
-        
     });
 
     
