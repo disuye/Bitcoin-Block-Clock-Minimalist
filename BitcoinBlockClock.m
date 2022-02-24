@@ -17,6 +17,7 @@
     
     [defaults registerDefaults:[NSDictionary dictionaryWithObjectsAndKeys:
                                 @"0", @"screenDisplayOption", // Default to show only on primary display
+                                @"0", @"timeZoneOption", // Default to display Abbreviated time zone, not Continent & City
                                 nil]];
     
     // Webview
@@ -26,8 +27,26 @@
     webView.drawsBackground = NO; // Avoids a "white flash" just before the index.html file has loaded
     [webView.mainFrame loadRequest:[NSURLRequest requestWithURL:indexHTMLDocumentURL cachePolicy:NSURLRequestUseProtocolCachePolicy timeoutInterval:30.0]];
     
-    // Feature: choose to load betwen index.html and index-umbrel.html in order to load hostname and mempool
-    
+    // Pass options from config sheet to index.js...
+
+    switch ([defaults integerForKey:@"timeZoneOption"]) {
+        case 0: {
+            NSString * javascriptString = @"const timeZoneOption = 'timeZoneAbbrv';";
+            [webView stringByEvaluatingJavaScriptFromString:javascriptString];
+            break;
+        }
+        case 1: {
+            NSString * javascriptString = @"const timeZoneOption = 'timeZoneCity';";
+            [webView stringByEvaluatingJavaScriptFromString:javascriptString];
+            break;
+        }
+        case 2: {
+            NSString * javascriptString = @"const timeZoneOption = 'timeZoneDisable';";
+            [webView stringByEvaluatingJavaScriptFromString:javascriptString];
+            break;
+        }
+
+    }
     
     // Show on screens based on preferences
     NSArray* screens = [NSScreen screens];
@@ -85,6 +104,7 @@
         }
         
         [screenDisplayOption selectItemAtIndex:[defaults integerForKey:@"screenDisplayOption"]];
+        [timeZoneOption selectItemAtIndex:[defaults integerForKey:@"timeZoneOption"]];
         
         return configSheet;
     }
@@ -100,8 +120,8 @@
         defaults = [ScreenSaverDefaults defaultsForModuleWithName:bitcoinClockModule];
         
         // Update our defaults
-        [defaults setInteger:[screenDisplayOption indexOfSelectedItem]
-                      forKey:@"screenDisplayOption"];
+        [defaults setInteger:[screenDisplayOption indexOfSelectedItem] forKey:@"screenDisplayOption"];
+        [defaults setInteger:[timeZoneOption indexOfSelectedItem] forKey:@"timeZoneOption"];
         
         // Save the settings to disk
         [defaults synchronize];
