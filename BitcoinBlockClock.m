@@ -29,9 +29,8 @@
     
     // Nuke variable when declared in index.html (which is required for the non-screensaver version)...
     
-    NSString * javascriptString = @"document.getElementById('timeZoneVariable').innerHTML='';";
+    NSString * javascriptString = @"document.getElementById('initialVariables').innerHTML='';";
     [webView stringByEvaluatingJavaScriptFromString:javascriptString];
-    
     
     // Pass options from config sheet to index.js...
 
