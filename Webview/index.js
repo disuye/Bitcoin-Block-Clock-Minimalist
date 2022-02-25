@@ -1,5 +1,5 @@
 const init = async () => {
-
+    
     // Design elements to render after DOM loaded...
     
     document.addEventListener('DOMContentLoaded', function show_stuff() {
@@ -15,7 +15,7 @@ const init = async () => {
             document.getElementById('clock').innerHTML = timeNow;
         }
    
-        // const "timeZoneOption" defined in BitcoinBlockClock.m when run as a screesnaver, defined in index.html when run in web browser...
+        // const "timeZoneOption" defined in BitcoinBlockClock.m when run as a screensaver; defined in index.html when run as web page...
         
         switch(timeZoneOption) {
             case "timeZoneCity":
@@ -29,7 +29,7 @@ const init = async () => {
                 var timeZone = (new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })).slice(5);
                 break;
         };
-        document.getElementById('timezone').innerHTML = timeZone;
+        document.getElementById('time_zone').innerHTML = timeZone;
     });
 
     
@@ -64,6 +64,8 @@ const init = async () => {
         document.getElementById('status').innerHTML = status + "connected to <a href='https://mempool.space/'>mempool.space</a>";
         clearTimeout(checkcnx); // Trash the looping page reload (checkcnx is first defined in index.html)
     };
+
+    document.querySelector('body').style.setProperty("opacity", "1.0", "important");
     
     // Open websocket...
 
