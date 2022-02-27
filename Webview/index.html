@@ -10,24 +10,32 @@
                     
     </head>
     <body>
-        <div id="block_height"></div>
         
         <div id="info_ticker">
             <div id="time_zone"></div>
             <div id="clock"></div>
             <div id="time_stamp"></div>
-                    
-            </div>
+        </div>
+        
+        <div id="block_height"></div>
                 
         <div id="console_text">
             <div id="status">
                 <script>
-                    document.getElementById("status").innerHTML = `status:&nbsp;attempting to connect<span class="cursor">&nbsp;&block;</span>`;
-                    // checkcnx is necessary for the screensaver version, if computer is offline, reload page until mempool.js becomes available...
-                    // TO DO: Make it more intelligent.
+                    // necessary for the screensaver version, if offline, reload page until mempool.js becomes available...
                     const checkcnx = setTimeout(function(){
                                                 location.reload();
                                             }, 10000);
+
+                    
+                    // Do stuff if no internet connection...
+                    if (navigator.onLine) {
+                        } else {
+                            document.querySelector('body').style.setProperty("opacity", "1.0", "important");
+                            todaysDate = new Intl.DateTimeFormat([], {dateStyle: "short"}).format(Date.now());
+                            document.getElementById("time_stamp").innerHTML = `<span style="color: rgb(99,99,99);">` + todaysDate + `</span>`;
+                            document.getElementById("status").innerHTML = `status:&nbsp;attempting to connect<span class="cursor">&nbsp;&block;</span>`;
+                    };
                     </script>
                 
             </div>
