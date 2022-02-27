@@ -112,7 +112,7 @@ body {
     font-family: 'Courier New', monospace;
     font-size: calc(4pt + 0.4vw);
     line-height: calc(4pt + 0.4vw);
-    color: rgba(255, 255, 255, 0.2);
+    color: rgba(99, 99, 99, 1.0);
 }
 
 /* make hyperlinks match regular text, based on parent styling */
