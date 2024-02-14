@@ -1,10 +1,11 @@
 # Bitcoin Block Clock Minimalist
-macOS screensaver powered by mempool.space 's awesome API. The original [Bitcoin Block Clock](https://raw.github.com/disuye/Bitcoin-Block-Clock) screensaver features a console style real-time data dump from Mempool. This Minimalist screensaver only shows block tip height, block timestamp, and local fiat time.
+macOS screensaver powered by mempool.space 's awesome API. This Minimalist screensaver only shows block tip height, block timestamp, and local fiat time.
 
 This saver requires an internet connection, otherwise nothing interesting is displayed.
 
 ![screenshot png](screenshot.png)
 
+The original [Bitcoin Block Clock](https://github.com/disuye/Bitcoin-Block-Clock) screensaver features a console style real-time data dump from Mempool, and it was a dirty test run. This Minimalist version is far superior imo :) 
 
 ## Info
 
