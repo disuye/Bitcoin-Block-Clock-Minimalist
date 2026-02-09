@@ -24,6 +24,12 @@ Ported from the original macOS `.saver` bundle (Cocoa/WebView) to a standalone `
 # Debug build + run fullscreen (move mouse to exit)
 ./build.sh run-full
 
+# Build release + install as screensaver daemon
+./build.sh install
+
+# Remove app + daemon
+./build.sh uninstall
+
 # Clean
 ./build.sh clean
 ```
@@ -38,16 +44,34 @@ For the Swift VS Code extension: install [Swift](https://marketplace.visualstudi
 
 ## Install as Screensaver
 
-Since macOS no longer supports `.saver` bundles with web content, this runs as a standalone app:
+Since macOS no longer supports `.saver` bundles with web content, this runs as a background daemon that monitors system idle time via IOKit and shows fullscreen windows when the threshold is reached.
 
-1. `cp -R "build/Bitcoin Block Clock.app" /Applications/`
-2. Add to **System Settings → General → Login Items** to launch at boot
-3. Optionally use a tool like [Hammerspoon](https://www.hammerspoon.org/) or a cron job to launch after idle
+```bash
+# Build, install to /Applications, and start the daemon
+./build.sh install
+
+# Remove app and daemon
+./build.sh uninstall
+```
+
+This installs a LaunchAgent (`~/Library/LaunchAgents/com.bitcoinblockclock.plist`) that starts the app at login in daemon mode. The app sits invisibly in the background, polls idle time every 5 seconds, and goes fullscreen when the idle threshold is reached. Any mouse/keyboard input dismisses it.
+
+Default settings (edit at the top of `build.sh`, then re-run `./build.sh install`):
+
+| Setting | Default | Description |
+|---|---|---|
+| `IDLE_SECONDS` | `300` | Seconds of inactivity before showing (5 minutes) |
+| `TIMEZONE` | `city` | Timezone display: `city`, `abbrev`, or `disable` |
+| `SCREEN_MODE` | `all-screens` | Display target: `all-screens`, `primary`, or `screen=N` |
+
+Logs: `/tmp/bitcoinblockclock.log`
 
 ## Command-line Options
 
 | Flag | Description |
 |---|---|
+| `--daemon` | Run as background daemon (monitor idle time, show/hide automatically) |
+| `--idle=N` | Idle threshold in seconds (default 300, minimum 10) |
 | `--windowed` | Run in a resizable window (debug mode) |
 | `--timezone=city` | Show timezone as city name (e.g. "Asia / Hong Kong") |
 | `--timezone=abbrev` | Show timezone abbreviation (e.g. "HKT") |
