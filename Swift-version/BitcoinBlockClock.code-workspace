@@ -1,0 +1,52 @@
+{
+    "folders": [
+        { "path": "." }
+    ],
+    "settings": {
+        "swift.path": "/usr/bin",
+        "editor.formatOnSave": true,
+        "files.exclude": {
+            ".build": true,
+            "build": false
+        }
+    },
+    "tasks": {
+        "version": "2.0.0",
+        "tasks": [
+            {
+                "label": "Build (Debug)",
+                "type": "shell",
+                "command": "./build.sh debug",
+                "group": { "kind": "build", "isDefault": true },
+                "problemMatcher": ["$swiftc"]
+            },
+            {
+                "label": "Build (Release)",
+                "type": "shell",
+                "command": "./build.sh release",
+                "group": "build",
+                "problemMatcher": ["$swiftc"]
+            },
+            {
+                "label": "Run Windowed",
+                "type": "shell",
+                "command": "./build.sh run",
+                "group": "test",
+                "problemMatcher": []
+            },
+            {
+                "label": "Run Fullscreen",
+                "type": "shell",
+                "command": "./build.sh run-full",
+                "group": "test",
+                "problemMatcher": []
+            },
+            {
+                "label": "Clean",
+                "type": "shell",
+                "command": "./build.sh clean",
+                "problemMatcher": []
+            }
+        ]
+    }
+}

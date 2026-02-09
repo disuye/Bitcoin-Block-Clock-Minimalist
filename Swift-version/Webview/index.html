@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="author" content="twitter @disuye / Dan F">
+        <meta name="description" content="Bitcoin Block Clock (and other useful info) pushed from http://mempool.space 's awesome API.">
+        <link rel="stylesheet" href="index.css">
+        <script src="https://mempool.space/mempool.js"></script>
+        <script src="index.js"></script>
+    </head>
+    <body>
+
+        <div id="info_ticker">
+            <div id="time_zone"></div>
+            <div id="clock"></div>
+            <div id="time_stamp"></div>
+        </div>
+
+        <div id="block_height"></div>
+
+        <div id="console_text">
+            <div id="status">
+                <script>
+                    // If offline, reload page until mempool.js becomes available...
+                    const checkcnx = setTimeout(function(){
+                        location.reload();
+                    }, 10000);
+
+                    if (!navigator.onLine) {
+                        document.querySelector('body').style.setProperty("opacity", "1.0", "important");
+                        todaysDate = new Intl.DateTimeFormat([], {dateStyle: "short"}).format(Date.now());
+                        document.getElementById("time_stamp").innerHTML =
+                            `<span style="color: rgb(99,99,99);">` + todaysDate + `</span>`;
+                        document.getElementById("status").innerHTML =
+                            `status:&nbsp;attempting to connect<span class="cursor">&nbsp;&block;</span>`;
+                    };
+                </script>
+            </div>
+        </div>
+
+        <div id="initialVariables">
+            <script>
+                // ── Cross-platform config via URL query params ──
+                // Consumed identically by:
+                //   - WKWebView  (Swift/.app wrapper)
+                //   - QWebEngineView (Qt wrapper)
+                //   - WebKitGTK  (Linux/XScreenSaver wrapper)
+                //   - Plain browser (standalone use)
+                //
+                // ?timezone=timeZoneCity | timeZoneAbbrv | timeZoneDisable
+                // ?screensaver=1        (signals we're running as a screensaver)
+                // ?is_preview=1         (preview thumbnail mode)
+
+                const _params = new URLSearchParams(window.location.search);
+                const timeZoneOption = _params.get('timezone') || 'timeZoneCity';
+            </script>
+        </div>
+
+    </body>
+</html>
