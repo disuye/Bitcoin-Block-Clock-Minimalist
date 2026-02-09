@@ -1,22 +1,94 @@
 import AppKit
 import WebKit
+import IOKit
 
 // MARK: - AppDelegate
+//
+// The app runs in two modes:
+//
+//   --windowed           Debug/preview mode (shows immediately, no idle watch)
+//   --daemon             Background daemon mode (watches idle time, auto-shows)
+//   (neither)            Immediate fullscreen mode (legacy behavior, shows now and quits on input)
+//
 
 class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var windows: [ScreenSaverWindow] = []
     private var config = ScreenSaverConfig.fromCommandLine()
+    private var idleTimer: Timer?
+    private var isShowing = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
-        guard let htmlURL = locateHTML() else {
+        guard locateHTML() != nil else {
             print("ERROR: Cannot find Webview/index.html")
             print("Searched relative to: \(executableDir().path)")
             NSApp.terminate(nil)
             return
         }
+
+        if config.daemon {
+            // Daemon mode: sit in background, poll idle time
+            print("Bitcoin Block Clock daemon started (idle threshold: \(config.idleSeconds)s)")
+            fflush(stdout)
+            startIdleWatch()
+        } else {
+            // Immediate mode: show now
+            showScreenSaver()
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        idleTimer?.invalidate()
+    }
+
+    // MARK: - Idle Time Monitoring
+
+    private func startIdleWatch() {
+        // Poll every 5 seconds — lightweight, uses IOKit HIDSystem idle time
+        idleTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            let idle = self.systemIdleTime()
+
+            if !self.isShowing && idle >= Double(self.config.idleSeconds) {
+                self.showScreenSaver()
+            }
+        }
+    }
+
+    /// Returns system idle time in seconds via IOKit (same source macOS uses internally)
+    private func systemIdleTime() -> Double {
+        var iterator: io_iterator_t = 0
+        let result = IOServiceGetMatchingServices(
+            kIOMainPortDefault,
+            IOServiceMatching("IOHIDSystem"),
+            &iterator
+        )
+        guard result == KERN_SUCCESS else { return 0 }
+        defer { IOObjectRelease(iterator) }
+
+        let entry = IOIteratorNext(iterator)
+        guard entry != 0 else { return 0 }
+        defer { IOObjectRelease(entry) }
+
+        var unmanagedDict: Unmanaged<CFMutableDictionary>?
+        guard IORegistryEntryCreateCFProperties(entry, &unmanagedDict, kCFAllocatorDefault, 0) == KERN_SUCCESS,
+              let dict = unmanagedDict?.takeRetainedValue() as? [String: Any],
+              let idleObj = dict["HIDIdleTime"] as? NSNumber else {
+            return 0
+        }
+
+        // HIDIdleTime is in nanoseconds
+        return idleObj.doubleValue / 1_000_000_000.0
+    }
+
+    // MARK: - Show / Dismiss
+
+    private func showScreenSaver() {
+        guard !isShowing else { return }
+        guard let htmlURL = locateHTML() else { return }
+        isShowing = true
 
         let screens = config.windowed ? [NSScreen.main!] : targetScreens()
 
@@ -24,12 +96,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let window = ScreenSaverWindow(
                 htmlURL: htmlURL,
                 config: config,
-                screen: screen
+                screen: screen,
+                onDismiss: { [weak self] in
+                    self?.dismissScreenSaver()
+                }
             )
             windows.append(window)
         }
 
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func dismissScreenSaver() {
+        NSCursor.unhide()
+
+        for w in windows {
+            w.window.orderOut(nil)
+        }
+        windows.removeAll()
+        isShowing = false
+
+        if !config.daemon {
+            // One-shot mode: quit after dismissal
+            NSApp.terminate(nil)
+        }
+        // Daemon mode: keep running, will re-show when idle again
     }
 
     // MARK: - Locate HTML
@@ -42,13 +133,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func locateHTML() -> URL? {
         let exe = executableDir()
         let candidates = [
-            // .app bundle: Contents/MacOS/../Resources/Webview/index.html
             exe.appendingPathComponent("../Resources/Webview/index.html").standardized,
-            // Dev: run from project root (e.g. `swift run` or direct execution)
             URL(fileURLWithPath: "Webview/index.html"),
-            // Dev: Webview next to binary
             exe.appendingPathComponent("Webview/index.html"),
-            // Fallback: cwd
             URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
                 .appendingPathComponent("Webview/index.html"),
         ]
@@ -84,6 +171,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
 struct ScreenSaverConfig {
     var windowed: Bool = false
+    var daemon: Bool = false
+    var idleSeconds: Int = 300  // 5 minutes default
     var timezone: String = "timeZoneDisable"
     var screenMode: ScreenMode = .primary
 
@@ -99,6 +188,14 @@ struct ScreenSaverConfig {
         for arg in CommandLine.arguments {
             if arg == "--windowed" {
                 config.windowed = true
+            }
+            else if arg == "--daemon" {
+                config.daemon = true
+            }
+            else if arg.hasPrefix("--idle=") {
+                if let secs = Int(String(arg.dropFirst("--idle=".count))) {
+                    config.idleSeconds = max(10, secs)
+                }
             }
             else if arg.hasPrefix("--timezone=") {
                 let val = String(arg.dropFirst("--timezone=".count))
@@ -124,8 +221,6 @@ struct ScreenSaverConfig {
 
 
 // MARK: - ScreenSaverWindow
-// Uses composition (owns an NSWindow) rather than subclassing,
-// which avoids NSWindow designated initializer pitfalls.
 
 class ScreenSaverWindow: NSObject {
 
@@ -134,34 +229,43 @@ class ScreenSaverWindow: NSObject {
     private let isWindowed: Bool
     private var mouseMoveCount = 0
     private var eventMonitors: [Any] = []
+    private var onDismiss: (() -> Void)?
 
-    init(htmlURL: URL, config: ScreenSaverConfig, screen: NSScreen) {
+    init(htmlURL: URL, config: ScreenSaverConfig, screen: NSScreen, onDismiss: @escaping () -> Void) {
         self.isWindowed = config.windowed
-
-        let frame = config.windowed
-            ? NSRect(x: 0, y: 0, width: 960, height: 540)
-            : screen.frame
+        self.onDismiss = onDismiss
 
         let styleMask: NSWindow.StyleMask = config.windowed
             ? [.titled, .closable, .resizable]
             : [.borderless]
 
+        // For borderless fullscreen, create at a dummy rect first,
+        // then setFrame to the exact screen frame in global coords.
+        // NSWindow(contentRect:screen:) can misposition on secondary
+        // displays because contentRect is interpreted relative to
+        // the screen's coordinate space.
+        let initialFrame = config.windowed
+            ? NSRect(x: 0, y: 0, width: 960, height: 540)
+            : screen.frame
+
         window = NSWindow(
-            contentRect: frame,
+            contentRect: initialFrame,
             styleMask: styleMask,
             backing: .buffered,
-            defer: false,
-            screen: screen
+            defer: false
         )
 
         super.init()
 
         if !config.windowed {
-            window.level = .screenSaver
-            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            // Force the window to exactly cover this screen
+            window.setFrame(screen.frame, display: true)
+            window.level = NSWindow.Level(Int(CGShieldingWindowLevel()))
+            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
             window.isOpaque = true
             window.hidesOnDeactivate = false
             window.acceptsMouseMovedEvents = true
+            window.canHide = false
         }
 
         window.backgroundColor = .black
@@ -176,9 +280,10 @@ class ScreenSaverWindow: NSObject {
         webView.setValue(false, forKey: "drawsBackground")
         webView.allowsBackForwardNavigationGestures = false
 
-        let container = NSView(frame: frame)
+        let container = NSView(frame: window.contentView?.bounds ?? window.frame)
         container.wantsLayer = true
         container.layer?.backgroundColor = NSColor.black.cgColor
+        container.autoresizingMask = [.width, .height]
         window.contentView = container
 
         webView.translatesAutoresizingMaskIntoConstraints = false
@@ -190,7 +295,7 @@ class ScreenSaverWindow: NSObject {
             webView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
         ])
 
-        // ── Load HTML with query params ──
+        // ── Load HTML ──
 
         let baseDir = htmlURL.deletingLastPathComponent()
         var components = URLComponents(url: htmlURL, resolvingAgainstBaseURL: false)!
@@ -204,7 +309,7 @@ class ScreenSaverWindow: NSObject {
 
         webView.loadFileURL(components.url!, allowingReadAccessTo: baseDir)
 
-        // ── Input handling via event monitors ──
+        // ── Input handling ──
 
         installEventMonitors()
 
@@ -228,19 +333,52 @@ class ScreenSaverWindow: NSObject {
         }
     }
 
-    // MARK: - Event monitors (screensaver exit behavior)
+    // MARK: - Event monitors
+
+    private func dismiss() {
+        onDismiss?()
+        onDismiss = nil  // prevent double-fire
+    }
 
     private func installEventMonitors() {
-        // Local monitors catch events directed at our window
+        // Use global monitors so we catch events even when WKWebView has focus
+        // (global monitors see events destined for any app)
+
+        if !isWindowed {
+            let globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] _ in
+                self?.dismiss()
+            }
+            if let m = globalKeyMonitor { eventMonitors.append(m) }
+
+            let globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+                self?.dismiss()
+            }
+            if let m = globalClickMonitor { eventMonitors.append(m) }
+
+            let globalMoveMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
+                guard let self = self else { return }
+                self.mouseMoveCount += 1
+                if self.mouseMoveCount > 5 {
+                    self.dismiss()
+                }
+            }
+            if let m = globalMoveMonitor { eventMonitors.append(m) }
+
+            let globalScrollMonitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] _ in
+                self?.dismiss()
+            }
+            if let m = globalScrollMonitor { eventMonitors.append(m) }
+        }
+
+        // Local monitors for events directed at our own windows
 
         let keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self else { return event }
             if self.isWindowed {
-                if event.keyCode == 53 { NSApp.terminate(nil) }  // Esc
+                if event.keyCode == 53 { self.dismiss() }
                 return event
             } else {
-                NSCursor.unhide()
-                NSApp.terminate(nil)
+                self.dismiss()
                 return nil
             }
         }
@@ -249,8 +387,7 @@ class ScreenSaverWindow: NSObject {
         let clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self = self else { return event }
             if !self.isWindowed {
-                NSCursor.unhide()
-                NSApp.terminate(nil)
+                self.dismiss()
                 return nil
             }
             return event
@@ -262,8 +399,7 @@ class ScreenSaverWindow: NSObject {
             if !self.isWindowed {
                 self.mouseMoveCount += 1
                 if self.mouseMoveCount > 5 {
-                    NSCursor.unhide()
-                    NSApp.terminate(nil)
+                    self.dismiss()
                     return nil
                 }
             }
@@ -274,8 +410,7 @@ class ScreenSaverWindow: NSObject {
         let scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
             guard let self = self else { return event }
             if !self.isWindowed {
-                NSCursor.unhide()
-                NSApp.terminate(nil)
+                self.dismiss()
                 return nil
             }
             return event

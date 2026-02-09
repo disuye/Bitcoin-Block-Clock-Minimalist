@@ -1,14 +1,10 @@
 # Bitcoin Block Clock (v2 — Swift/macOS)
 
-macOS screensaver powered by mempool.space 's awesome API. The original [Bitcoin Block Clock](https://raw.github.com/disuye/Bitcoin-Block-Clock) screensaver features a console style real-time data dump from Mempool. This Minimalist screensaver only shows block tip height, block timestamp, and local fiat time.
+Cross-platform-ready screensaver displaying current Bitcoin block height, timestamp, and local time via [mempool.space](https://mempool.space) WebSocket API.
 
-This saver requires an internet connection, otherwise nothing interesting is displayed.
+Ported from the original macOS `.saver` bundle (Cocoa/WebView) to a standalone `.app` using Swift + WKWebView. The web layer (HTML/CSS/JS) is fully self-contained and portable to Linux (WebKitGTK) or Qt (QWebEngineView) wrappers.
 
-![screenshot png](screenshot.png)
-
-## Info
-
-Includes a tweaked version of [GeoSans Light](https://www.dafont.com/geo-sans-light.font) font, created by [Manfred Klein](https://www.fontzillion.com/fonts/manfred-klein/geo-sans-light). I had some kerning issues, so converted the TTF to WOFF2 using 'Font-face Generator' on Font Squirrel.
+![screenshot](screenshot.png)
 
 ## Requirements
 

@@ -1,20 +1,16 @@
 #!/bin/bash
 # ─────────────────────────────────────────────────────────────
 # build.sh — Bitcoin Block Clock
+# Builds the .app (Swift/WKWebView) and .saver shim (Obj-C)
 #
 # Usage:
-#   ./build.sh              Build release .app
-#   ./build.sh debug        Build debug .app
+#   ./build.sh              Build release .app + .saver
+#   ./build.sh debug        Build debug .app + .saver
 #   ./build.sh run          Build debug + launch windowed
-#   ./build.sh run-full     Build debug + launch fullscreen (immediate)
-#   ./build.sh install      Build release + install .app + LaunchAgent
-#   ./build.sh uninstall    Remove .app + LaunchAgent
+#   ./build.sh run-full     Build debug + launch fullscreen
+#   ./build.sh install      Build release + install to ~/Library/Screen Savers
+#   ./build.sh uninstall    Remove from ~/Library/Screen Savers
 #   ./build.sh clean        Clean build artifacts
-#
-# The installed app runs as a background daemon that monitors
-# system idle time and shows the screensaver automatically.
-# No .saver bundle needed — this bypasses Apple's sandboxed
-# screensaver framework entirely.
 # ─────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -23,18 +19,11 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_NAME="Bitcoin Block Clock"
 BUNDLE_ID="com.bitcoinblockclock"
 EXECUTABLE="BitcoinBlockClock"
+SAVER_NAME="BitcoinBlockClock"
 VERSION="2.0.0"
 
-# ── Configurable defaults (edit these) ──
-IDLE_SECONDS=300         # 5 minutes
-TIMEZONE="city"           # city | abbrev | disable
-SCREEN_MODE="all-screens" # all-screens | primary | screen=N
-
 MODE="${1:-release}"
-INSTALL_DIR="/Applications"
-AGENT_DIR="$HOME/Library/LaunchAgents"
-AGENT_LABEL="$BUNDLE_ID"
-AGENT_PLIST="$AGENT_DIR/$AGENT_LABEL.plist"
+INSTALL_DIR="$HOME/Library/Screen Savers"
 
 # ── Clean ──
 
@@ -50,20 +39,10 @@ fi
 
 if [[ "$MODE" == "uninstall" ]]; then
     echo "Uninstalling..."
-
-    # Stop the daemon
-    launchctl bootout "gui/$(id -u)/$AGENT_LABEL" 2>/dev/null || true
-
-    # Remove LaunchAgent
-    rm -f "$AGENT_PLIST"
-
-    # Remove app
+    rm -rf "$INSTALL_DIR/${SAVER_NAME}.saver"
     rm -rf "$INSTALL_DIR/${APP_NAME}.app"
-
-    echo "Removed:"
-    echo "  $INSTALL_DIR/${APP_NAME}.app"
-    echo "  $AGENT_PLIST"
-    echo "Done."
+    echo "Removed from: $INSTALL_DIR"
+    echo "You may need to restart System Settings to see the change."
     exit 0
 fi
 
@@ -81,10 +60,10 @@ case "$MODE" in
 esac
 
 # ══════════════════════════════════════════════════════════════
-# 1. Build
+# 1. Build the Swift .app via SPM
 # ══════════════════════════════════════════════════════════════
 
-echo "Building ($CONFIG)..."
+echo "Building .app ($CONFIG)..."
 cd "$PROJECT_DIR"
 swift build $SWIFT_FLAGS 2>&1
 
@@ -95,9 +74,9 @@ if [[ ! -f "$BINARY" ]]; then
     exit 1
 fi
 
-# ══════════════════════════════════════════════════════════════
-# 2. Assemble .app bundle
-# ══════════════════════════════════════════════════════════════
+echo "Binary: $BINARY"
+
+# ── Assemble .app bundle ──
 
 APP_DIR="$PROJECT_DIR/build/${APP_NAME}.app"
 CONTENTS="$APP_DIR/Contents"
@@ -109,10 +88,7 @@ mkdir -p "$MACOS" "$RESOURCES"
 
 cp "$BINARY" "$MACOS/$EXECUTABLE"
 cp -R "$PROJECT_DIR/Webview" "$RESOURCES/Webview"
-
-if [[ -f "$PROJECT_DIR/AppIcon.icns" ]]; then
-    cp "$PROJECT_DIR/AppIcon.icns" "$RESOURCES/AppIcon.icns"
-fi
+cp "$PROJECT_DIR/AppIcon.icns" "$RESOURCES/AppIcon.icns"
 
 cat > "$CONTENTS/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -158,90 +134,105 @@ PLIST
 echo "Built: $APP_DIR"
 
 # ══════════════════════════════════════════════════════════════
-# 3. Run / Install
+# 2. Build the .saver shim (Objective-C, compiled with clang)
 # ══════════════════════════════════════════════════════════════
 
-case "$MODE" in
-    run)
-        echo "Launching windowed..."
-        "$MACOS/$EXECUTABLE" --windowed --timezone="$TIMEZONE"
-        ;;
-    run-full)
-        echo "Launching fullscreen (immediate, move mouse to dismiss)..."
-        "$MACOS/$EXECUTABLE" --timezone="$TIMEZONE" --"$SCREEN_MODE"
-        ;;
-    install)
-        echo ""
+echo "Building .saver shim..."
 
-        # Stop existing daemon
-        launchctl bootout "gui/$(id -u)/$AGENT_LABEL" 2>/dev/null || true
+SAVER_DIR="$PROJECT_DIR/build/${SAVER_NAME}.saver"
+SAVER_CONTENTS="$SAVER_DIR/Contents"
+SAVER_MACOS="$SAVER_CONTENTS/MacOS"
+SAVER_RESOURCES="$SAVER_CONTENTS/Resources"
+SHIM_SRC="$PROJECT_DIR/ScreenSaverShim/BitcoinBlockClockShim.m"
 
-        # Copy .app to /Applications
-        rm -rf "$INSTALL_DIR/${APP_NAME}.app"
-        cp -R "$APP_DIR" "$INSTALL_DIR/"
-        echo "Installed: $INSTALL_DIR/${APP_NAME}.app"
+rm -rf "$SAVER_DIR"
+mkdir -p "$SAVER_MACOS" "$SAVER_RESOURCES"
 
-        # Build launch arguments
-        LAUNCH_ARGS="--daemon --idle=$IDLE_SECONDS --timezone=$TIMEZONE --$SCREEN_MODE"
+# Compile the shim as a bundle (.saver is just a .bundle)
+clang -fobjc-arc \
+    -framework ScreenSaver \
+    -framework Cocoa \
+    -bundle \
+    -mmacosx-version-min=12.0 \
+    -o "$SAVER_MACOS/$SAVER_NAME" \
+    "$SHIM_SRC"
 
-        # Create LaunchAgent
-        mkdir -p "$AGENT_DIR"
-        cat > "$AGENT_PLIST" << AGENT
+# Generate .saver Info.plist
+cat > "$SAVER_CONTENTS/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>Label</key>
-    <string>${AGENT_LABEL}</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>${INSTALL_DIR}/${APP_NAME}.app/Contents/MacOS/${EXECUTABLE}</string>
-        <string>--daemon</string>
-        <string>--idle=${IDLE_SECONDS}</string>
-        <string>--timezone=${TIMEZONE}</string>
-        <string>--${SCREEN_MODE}</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>LimitLoadToSessionType</key>
-    <string>Aqua</string>
-    <key>KeepAlive</key>
-    <dict>
-        <key>SuccessfulExit</key>
-        <false/>
-    </dict>
-    <key>StandardOutPath</key>
-    <string>/tmp/bitcoinblockclock.log</string>
-    <key>StandardErrorPath</key>
-    <string>/tmp/bitcoinblockclock.log</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>${SAVER_NAME}</string>
+    <key>CFBundleIdentifier</key>
+    <string>${BUNDLE_ID}.saver</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>${APP_NAME}</string>
+    <key>CFBundlePackageType</key>
+    <string>BNDL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>${VERSION}</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>© disuye</string>
+    <key>NSPrincipalClass</key>
+    <string>BitcoinBlockClockShim</string>
 </dict>
 </plist>
-AGENT
+PLIST
 
-        echo "Installed: $AGENT_PLIST"
+echo "Built: $SAVER_DIR"
 
-        # Load the agent
-        launchctl bootstrap "gui/$(id -u)" "$AGENT_PLIST"
+# ══════════════════════════════════════════════════════════════
+# 3. Run / Install
+# ══════════════════════════════════════════════════════════════
 
+case "$MODE" in
+    run)
         echo ""
-        echo "✓ Bitcoin Block Clock is now running as a background daemon."
-        echo "  Idle timeout:  ${IDLE_SECONDS}s"
-        echo "  Timezone:      ${TIMEZONE}"
-        echo "  Screens:       ${SCREEN_MODE}"
+        echo "Launching windowed..."
+        "$MACOS/$EXECUTABLE" --windowed --timezone=city
+        ;;
+    run-full)
         echo ""
-        echo "  Logs:          /tmp/bitcoinblockclock.log"
-        echo "  Edit config:   edit IDLE_SECONDS / TIMEZONE / SCREEN_MODE in build.sh, then re-run ./build.sh install"
-        echo "  Uninstall:     ./build.sh uninstall"
+        echo "Launching fullscreen..."
+        "$MACOS/$EXECUTABLE" --timezone=city
+        ;;
+    install)
+        echo ""
+        echo "Installing to: $INSTALL_DIR"
+        mkdir -p "$INSTALL_DIR"
+
+        # Remove old versions
+        rm -rf "$INSTALL_DIR/${SAVER_NAME}.saver"
+        rm -rf "$INSTALL_DIR/${APP_NAME}.app"
+
+        # Copy both
+        cp -R "$SAVER_DIR" "$INSTALL_DIR/"
+        cp -R "$APP_DIR"   "$INSTALL_DIR/"
+
+        echo "Installed:"
+        echo "  $INSTALL_DIR/${SAVER_NAME}.saver  (shows in System Settings)"
+        echo "  $INSTALL_DIR/${APP_NAME}.app       (launched by the .saver)"
+        echo ""
+        echo "Open System Settings > Screen Saver to select '${APP_NAME}'."
+        echo "You may need to restart System Settings if it was already open."
         ;;
     *)
         echo ""
-        echo "To install as a screensaver daemon:"
+        echo "To install as a system screensaver:"
         echo "  ./build.sh install"
         echo ""
         echo "To test:"
         echo "  ./build.sh run           # windowed"
-        echo "  ./build.sh run-full      # fullscreen (immediate)"
+        echo "  ./build.sh run-full      # fullscreen"
         echo ""
         echo "To uninstall:"
         echo "  ./build.sh uninstall"
